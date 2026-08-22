@@ -3,3 +3,6 @@
 README.md
 compose.yaml
 *.log
+data/*.db*
+__pycache__
+*.pyc

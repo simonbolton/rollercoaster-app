@@ -3,4 +3,11 @@ services:
     build: .
     ports:
       - "8080:8080"
+    environment:
+      SYNC_ON_START: "true"
+    volumes:
+      - coaster-data:/app/data
     restart: unless-stopped
+
+volumes:
+  coaster-data:
