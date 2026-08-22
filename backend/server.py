@@ -2,6 +2,7 @@ import json
 import mimetypes
 import os
 import sqlite3
+from difflib import SequenceMatcher
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -32,6 +33,8 @@ class Handler(SimpleHTTPRequestHandler):
             return self.send_json({"status": "healthy"})
         if parsed.path == "/api/coasters":
             return self.list_coasters(parse_qs(parsed.query))
+        if parsed.path == "/api/search":
+            return self.search_coasters(parse_qs(parsed.query))
         if parsed.path == "/api/stats":
             return self.stats()
         if parsed.path.startswith("/api/coasters/"):
@@ -65,6 +68,40 @@ class Handler(SimpleHTTPRequestHandler):
         with connect() as connection:
             row = connection.execute("SELECT * FROM coasters WHERE wikidata_id = ?", (wikidata_id,)).fetchone()
         self.send_json(dict(row) if row else {"error": "Coaster not found"}, 200 if row else 404)
+
+    def search_coasters(self, params):
+        query = params.get("q", [""])[0].strip().casefold()
+        limit = min(max(int(params.get("limit", ["8"])[0]), 1), 20)
+        if len(query) < 2:
+            return self.send_json({"query": query, "items": []})
+
+        with connect() as connection:
+            rows = connection.execute("SELECT * FROM coasters").fetchall()
+
+        ranked = []
+        fields = (("name", 1.0), ("park", 0.86), ("manufacturer", 0.76), ("country", 0.68))
+        for row in rows:
+            best_score, matched_on = 0.0, "name"
+            for field, weight in fields:
+                candidate = (row[field] or "").casefold()
+                if not candidate:
+                    continue
+                similarity = SequenceMatcher(None, query, candidate).ratio()
+                if query in candidate:
+                    similarity = max(similarity, 0.96 if candidate.startswith(query) else 0.9)
+                else:
+                    similarity = max(similarity, *(SequenceMatcher(None, query, word).ratio() for word in candidate.split()))
+                score = similarity * weight
+                if score > best_score:
+                    best_score, matched_on = score, field
+            if best_score >= 0.38:
+                item = dict(row)
+                item["match_score"] = round(best_score, 3)
+                item["matched_on"] = matched_on
+                ranked.append(item)
+
+        ranked.sort(key=lambda item: (-item["match_score"], item["name"]))
+        self.send_json({"query": query, "items": ranked[:limit]})
 
     def stats(self):
         with connect() as connection:

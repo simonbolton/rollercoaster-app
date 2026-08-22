@@ -15,6 +15,7 @@ The first start seeds the database immediately, then refreshes it from Wikidata 
 ## API
 
 - `GET /api/coasters?q=taron&country=Germany&limit=100&offset=0`
+- `GET /api/search?q=stel+vengeance&limit=8` (ranked fuzzy suggestions)
 - `GET /api/coasters/Q16665871`
 - `GET /api/stats`
 

@@ -31,7 +31,10 @@
     <section class="explorer">
       <div class="section-heading">
         <div><p class="eyebrow dark">Start exploring</p><h2>Legendary coasters</h2></div>
-        <label class="search"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="Search rides or parks…" aria-label="Search rides or parks"></label>
+        <div class="search-wrap">
+          <label class="search"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="Search rides or parks…" aria-label="Search rides or parks" autocomplete="off" aria-controls="suggestions" aria-expanded="false"></label>
+          <div class="suggestions" id="suggestions" role="listbox" aria-label="Suggested rollercoasters" hidden></div>
+        </div>
       </div>
       <div class="filters" id="filters" aria-label="Filter by country"></div>
       <div class="grid" id="coasterGrid"></div>

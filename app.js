@@ -4,9 +4,14 @@ let saved=new Set(JSON.parse(localStorage.getItem('savedCoasters')||'[]'));
 const grid=document.querySelector('#coasterGrid');
 const filters=document.querySelector('#filters');
 const search=document.querySelector('#search');
+const suggestions=document.querySelector('#suggestions');
+let suggestionResults=[];
+let activeSuggestion=-1;
+let searchTimer;
 
 const display=(value,suffix='')=>value===null||value===undefined?'—':`${Number.isInteger(value)?value:Number(value).toFixed(1)}${suffix}`;
 const colorFor=name=>['#ff6848','#9cddff','#d8ff3e','#ffc56b','#cab7ff','#71e2be','#ff9bc7','#f0a466','#85a7ff'][[...name].reduce((n,c)=>n+c.charCodeAt(0),0)%9];
+const escapeHtml=value=>String(value).replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 
 function renderFilters(){
   filters.innerHTML='';
@@ -23,8 +28,8 @@ function renderCards(){
   const query=search.value.trim().toLowerCase();
   const shown=coasters.filter(c=>(activeCountry==='All'||c.country===activeCountry)&&`${c.name} ${c.park||''} ${c.manufacturer||''}`.toLowerCase().includes(query));
   grid.innerHTML=shown.slice(0,100).map((c,index)=>`<article class="card">
-    <div class="card-visual" style="--card-color:${colorFor(c.name)}"><span class="rank">${String(index+1).padStart(2,'0')}</span><button class="save ${saved.has(c.wikidata_id)?'saved':''}" data-id="${c.wikidata_id}" aria-label="Save ${c.name}">${saved.has(c.wikidata_id)?'♥':'♡'}</button></div>
-    <div class="card-body"><span class="type">${c.manufacturer||'Manufacturer unknown'}</span><h3>${c.name}</h3><p class="location">${c.park||'Park unknown'}${c.country?` · ${c.country}`:''}</p>
+    <div class="card-visual" style="--card-color:${colorFor(c.name)}"><span class="rank">${String(index+1).padStart(2,'0')}</span><button class="save ${saved.has(c.wikidata_id)?'saved':''}" data-id="${c.wikidata_id}" aria-label="Save ${escapeHtml(c.name)}">${saved.has(c.wikidata_id)?'♥':'♡'}</button></div>
+    <div class="card-body"><span class="type">${escapeHtml(c.manufacturer||'Manufacturer unknown')}</span><h3>${escapeHtml(c.name)}</h3><p class="location">${escapeHtml(c.park||'Park unknown')}${c.country?` · ${escapeHtml(c.country)}`:''}</p>
     <div class="metrics"><div><strong>${display(c.height_m,'m')}</strong><span>Height</span></div><div><strong>${display(c.length_m,'m')}</strong><span>Length</span></div><div><strong>${display(c.speed_kmh)}</strong><span>km/h</span></div><div><strong>${c.opened?.slice(0,4)||'—'}</strong><span>Opened</span></div></div>
     ${c.capacity?`<p class="capacity">Capacity: ${c.capacity.toLocaleString()} riders/hour</p>`:''}</div>
   </article>`).join('');
@@ -34,6 +39,30 @@ function renderCards(){
 
 function toggleSave(id){saved.has(id)?saved.delete(id):saved.add(id);localStorage.setItem('savedCoasters',JSON.stringify([...saved]));updateSaved();renderCards()}
 function updateSaved(){document.querySelector('#savedCount').textContent=saved.size}
+
+function closeSuggestions(){suggestions.hidden=true;search.setAttribute('aria-expanded','false');activeSuggestion=-1}
+function showSuggestions(items){
+  suggestionResults=items;
+  suggestions.innerHTML=items.map((item,index)=>`<button class="suggestion" role="option" data-index="${index}"><span><strong>${escapeHtml(item.name)}</strong><span>${escapeHtml(item.park||item.country||'Park unknown')}</span></span><span class="suggestion-match">${item.matched_on==='name'?'Name match':`via ${escapeHtml(item.matched_on)}`}</span></button>`).join('');
+  suggestions.hidden=items.length===0;
+  search.setAttribute('aria-expanded',String(items.length>0));
+  suggestions.querySelectorAll('.suggestion').forEach(button=>button.onclick=()=>selectSuggestion(Number(button.dataset.index)));
+}
+function selectSuggestion(index){
+  const item=suggestionResults[index];
+  if(!item)return;
+  if(!coasters.some(coaster=>coaster.wikidata_id===item.wikidata_id))coasters.unshift(item);
+  activeCountry='All';search.value=item.name;renderFilters();renderCards();closeSuggestions();
+  grid.scrollIntoView({behavior:'smooth',block:'start'});
+}
+async function fetchSuggestions(){
+  const query=search.value.trim();
+  if(query.length<2)return closeSuggestions();
+  try{
+    const response=await fetch(`/api/search?q=${encodeURIComponent(query)}&limit=8`).then(result=>result.json());
+    if(search.value.trim()===query)showSuggestions(response.items);
+  }catch(error){closeSuggestions()}
+}
 
 async function load(){
   try{
@@ -48,7 +77,17 @@ async function load(){
   }
 }
 
-search.addEventListener('input',renderCards);
+search.addEventListener('input',()=>{renderCards();clearTimeout(searchTimer);searchTimer=setTimeout(fetchSuggestions,180)});
+search.addEventListener('keydown',event=>{
+  const options=[...suggestions.querySelectorAll('.suggestion')];
+  if(event.key==='Escape')return closeSuggestions();
+  if(!options.length||!['ArrowDown','ArrowUp','Enter'].includes(event.key))return;
+  event.preventDefault();
+  if(event.key==='Enter'&&activeSuggestion>=0)return selectSuggestion(activeSuggestion);
+  activeSuggestion=event.key==='ArrowDown'?Math.min(activeSuggestion+1,options.length-1):Math.max(activeSuggestion-1,0);
+  options.forEach((option,index)=>option.classList.toggle('active',index===activeSuggestion));
+});
+document.addEventListener('click',event=>{if(!event.target.closest('.search-wrap'))closeSuggestions()});
 document.querySelector('#savedButton').onclick=()=>{search.value='';activeCountry='All';grid.scrollIntoView({behavior:'smooth'});renderFilters();renderCards();document.querySelectorAll('.card').forEach(card=>{if(!saved.has(card.querySelector('.save').dataset.id))card.style.display='none'})};
 document.querySelector('#year').textContent=new Date().getFullYear();
 updateSaved();load();
