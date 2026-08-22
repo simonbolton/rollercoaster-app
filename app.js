@@ -12,6 +12,7 @@ let searchTimer;
 const display=(value,suffix='')=>value===null||value===undefined?'—':`${Number.isInteger(value)?value:Number(value).toFixed(1)}${suffix}`;
 const colorFor=name=>['#ff6848','#9cddff','#d8ff3e','#ffc56b','#cab7ff','#71e2be','#ff9bc7','#f0a466','#85a7ff'][[...name].reduce((n,c)=>n+c.charCodeAt(0),0)%9];
 const escapeHtml=value=>String(value).replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+const youtubePovUrl=coaster=>`https://www.youtube.com/results?search_query=${encodeURIComponent(`${coaster.name} ${coaster.park||''} roller coaster POV front seat`)}`;
 
 function renderFilters(){
   filters.innerHTML='';
@@ -37,7 +38,7 @@ function renderCards(){
       </div>
       <div class="card-face card-back" style="--card-color:${colorFor(c.name)}">
         ${c.image_url?`<img src="${escapeHtml(c.image_url)}" alt="${escapeHtml(c.name)} rollercoaster" loading="lazy">`:'<div class="photo-missing">Photo not available</div>'}
-        <div class="photo-caption"><span>${escapeHtml(c.park||'Rollercoaster')}</span><h3>${escapeHtml(c.name)}</h3>${c.image_source_url?`<a href="${escapeHtml(c.image_source_url)}" target="_blank" rel="noopener">View image source ↗</a>`:''}<small>Click to return</small></div>
+        <div class="photo-caption"><span>${escapeHtml(c.park||'Rollercoaster')}</span><h3>${escapeHtml(c.name)}</h3><div class="photo-links"><a class="pov-link" href="${escapeHtml(youtubePovUrl(c))}" target="_blank" rel="noopener">Watch POV on YouTube ▶</a>${c.image_source_url?`<a href="${escapeHtml(c.image_source_url)}" target="_blank" rel="noopener">Image source ↗</a>`:''}</div><small>Click to return</small></div>
       </div>
     </div>
   </article>`).join('');

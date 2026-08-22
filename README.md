@@ -28,6 +28,8 @@ Records include height, track length, speed, opening date, park, country, manufa
 - The bundled catalogue is derived from the [Roller Coaster Database dataset](https://www.kaggle.com/datasets/robikscube/rollercoaster-database), released under CC0 and originally collected from Wikipedia.
 - `backend/import_cc0.py` reproduces the normalization from the downloaded `coaster_db.csv` file and can derive countries from public-domain Natural Earth boundaries.
 - `backend/index_images.py` indexes representative photos and source pages through Wikipedia's public API.
+
+Every coaster card also links to a targeted YouTube search for a front-seat POV using the ride and park names, avoiding stale hard-coded video IDs.
 - `backend/sync_wikidata.py` adds or updates records from Wikidata through a configurable SPARQL endpoint.
 
 The importer rejects implausible measurement outliers and never manufactures missing statistics.
