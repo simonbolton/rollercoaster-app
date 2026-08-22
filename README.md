@@ -25,11 +25,11 @@ Records include height, track length, speed, opening date, park, country, manufa
 After the first successful GitHub Actions run:
 
 ```bash
-docker pull ghcr.io/OWNER/rollercoaster-app:latest
-docker run -d --name airtime-atlas -p 8080:8080 --restart unless-stopped ghcr.io/OWNER/rollercoaster-app:latest
+docker pull ghcr.io/simonbolton/rollercoaster-app:latest
+docker run -d --name airtime-atlas -p 8080:8080 --restart unless-stopped ghcr.io/simonbolton/rollercoaster-app:latest
 ```
 
-Replace `OWNER` with the lowercase GitHub account name. The workflow also publishes immutable `sha-*` tags and version tags such as `v1.0.0`.
+The workflow also publishes immutable `sha-*` tags and version tags such as `v1.0.0`.
 
 ## Local development
 
