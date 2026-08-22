@@ -112,6 +112,7 @@ def normalize(bindings):
             "capacity": value(row, "capacity", lambda x: int(float(x))),
             "inversions": value(row, "inversions", lambda x: int(float(x))),
             "image_url": value(row, "image"),
+            "image_source_url": entity_url,
             "latitude": latitude,
             "longitude": longitude,
             "source_url": entity_url,

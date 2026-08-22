@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS coasters (
   capacity INTEGER,
   inversions INTEGER,
   image_url TEXT,
+  image_source_url TEXT,
   latitude REAL,
   longitude REAL,
   source_url TEXT NOT NULL,
@@ -34,11 +35,11 @@ CREATE INDEX IF NOT EXISTS idx_coasters_country ON coasters(country);
 UPSERT = """
 INSERT INTO coasters (
   wikidata_id, name, park, country, manufacturer, opened, height_m,
-  length_m, speed_kmh, capacity, inversions, image_url, latitude,
+  length_m, speed_kmh, capacity, inversions, image_url, image_source_url, latitude,
   longitude, source_url, updated_at
 ) VALUES (
   :wikidata_id, :name, :park, :country, :manufacturer, :opened, :height_m,
-  :length_m, :speed_kmh, :capacity, :inversions, :image_url, :latitude,
+  :length_m, :speed_kmh, :capacity, :inversions, :image_url, :image_source_url, :latitude,
   :longitude, :source_url, CURRENT_TIMESTAMP
 )
 ON CONFLICT(wikidata_id) DO UPDATE SET
@@ -47,6 +48,7 @@ ON CONFLICT(wikidata_id) DO UPDATE SET
   height_m=excluded.height_m, length_m=excluded.length_m,
   speed_kmh=excluded.speed_kmh, capacity=excluded.capacity,
   inversions=excluded.inversions, image_url=excluded.image_url,
+  image_source_url=excluded.image_source_url,
   latitude=excluded.latitude, longitude=excluded.longitude,
   source_url=excluded.source_url, updated_at=CURRENT_TIMESTAMP
 """
@@ -58,6 +60,9 @@ def connect():
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA journal_mode=WAL")
     connection.executescript(SCHEMA)
+    columns = {row[1] for row in connection.execute("PRAGMA table_info(coasters)")}
+    if "image_source_url" not in columns:
+        connection.execute("ALTER TABLE coasters ADD COLUMN image_source_url TEXT")
     return connection
 
 

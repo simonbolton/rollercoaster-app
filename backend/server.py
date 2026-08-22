@@ -46,7 +46,7 @@ class Handler(SimpleHTTPRequestHandler):
     def list_coasters(self, params):
         search = params.get("q", [""])[0].strip()
         country = params.get("country", [""])[0].strip()
-        limit = min(max(int(params.get("limit", ["100"])[0]), 1), 500)
+        limit = min(max(int(params.get("limit", ["100"])[0]), 1), 2000)
         offset = max(int(params.get("offset", ["0"])[0]), 0)
         where, values = [], []
         if search:

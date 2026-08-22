@@ -15,7 +15,7 @@ const escapeHtml=value=>String(value).replace(/[&<>"']/g,char=>({'&':'&amp;','<'
 
 function renderFilters(){
   filters.innerHTML='';
-  ['All',...new Set(coasters.map(c=>c.country).filter(Boolean))].slice(0,9).forEach(country=>{
+  ['All',...[...new Set(coasters.map(c=>c.country).filter(Boolean))].sort((a,b)=>a.localeCompare(b))].forEach(country=>{
     const button=document.createElement('button');
     button.className=`filter ${country===activeCountry?'active':''}`;
     button.textContent=country;
@@ -27,14 +27,27 @@ function renderFilters(){
 function renderCards(){
   const query=search.value.trim().toLowerCase();
   const shown=coasters.filter(c=>(activeCountry==='All'||c.country===activeCountry)&&`${c.name} ${c.park||''} ${c.manufacturer||''}`.toLowerCase().includes(query));
-  grid.innerHTML=shown.slice(0,100).map((c,index)=>`<article class="card">
-    <div class="card-visual" style="--card-color:${colorFor(c.name)}"><span class="rank">${String(index+1).padStart(2,'0')}</span><button class="save ${saved.has(c.wikidata_id)?'saved':''}" data-id="${c.wikidata_id}" aria-label="Save ${escapeHtml(c.name)}">${saved.has(c.wikidata_id)?'♥':'♡'}</button></div>
-    <div class="card-body"><span class="type">${escapeHtml(c.manufacturer||'Manufacturer unknown')}</span><h3>${escapeHtml(c.name)}</h3><p class="location">${escapeHtml(c.park||'Park unknown')}${c.country?` · ${escapeHtml(c.country)}`:''}</p>
-    <div class="metrics"><div><strong>${display(c.height_m,'m')}</strong><span>Height</span></div><div><strong>${display(c.length_m,'m')}</strong><span>Length</span></div><div><strong>${display(c.speed_kmh)}</strong><span>km/h</span></div><div><strong>${c.opened?.slice(0,4)||'—'}</strong><span>Opened</span></div></div>
-    ${c.capacity?`<p class="capacity">Capacity: ${c.capacity.toLocaleString()} riders/hour</p>`:''}</div>
+  grid.innerHTML=shown.slice(0,100).map((c,index)=>`<article class="card" tabindex="0" role="button" aria-label="Flip ${escapeHtml(c.name)} card" aria-pressed="false">
+    <div class="card-inner">
+      <div class="card-face card-front">
+        <div class="card-visual" style="--card-color:${colorFor(c.name)}"><span class="rank">${String(index+1).padStart(2,'0')}</span><button class="save ${saved.has(c.wikidata_id)?'saved':''}" data-id="${c.wikidata_id}" aria-label="Save ${escapeHtml(c.name)}">${saved.has(c.wikidata_id)?'♥':'♡'}</button></div>
+        <div class="card-body"><span class="type">${escapeHtml(c.manufacturer||'Manufacturer unknown')}</span><h3>${escapeHtml(c.name)}</h3><p class="location">${escapeHtml(c.park||'Park unknown')}${c.country?` · ${escapeHtml(c.country)}`:''}</p>
+        <div class="metrics"><div><strong>${display(c.height_m,'m')}</strong><span>Height</span></div><div><strong>${display(c.length_m,'m')}</strong><span>Length</span></div><div><strong>${display(c.speed_kmh)}</strong><span>km/h</span></div><div><strong>${c.opened?.slice(0,4)||'—'}</strong><span>Opened</span></div></div>
+        ${c.capacity?`<p class="capacity">Capacity: ${c.capacity.toLocaleString()} riders/hour</p>`:''}<span class="flip-hint">Click to see photo ↗</span></div>
+      </div>
+      <div class="card-face card-back" style="--card-color:${colorFor(c.name)}">
+        ${c.image_url?`<img src="${escapeHtml(c.image_url)}" alt="${escapeHtml(c.name)} rollercoaster" loading="lazy">`:'<div class="photo-missing">Photo not available</div>'}
+        <div class="photo-caption"><span>${escapeHtml(c.park||'Rollercoaster')}</span><h3>${escapeHtml(c.name)}</h3>${c.image_source_url?`<a href="${escapeHtml(c.image_source_url)}" target="_blank" rel="noopener">View image source ↗</a>`:''}<small>Click to return</small></div>
+      </div>
+    </div>
   </article>`).join('');
   document.querySelector('#emptyState').hidden=shown.length>0;
-  document.querySelectorAll('.save').forEach(button=>button.onclick=()=>toggleSave(button.dataset.id));
+  document.querySelectorAll('.save').forEach(button=>button.onclick=event=>{event.stopPropagation();toggleSave(button.dataset.id)});
+  document.querySelectorAll('.card').forEach(card=>{
+    const flip=()=>{card.classList.toggle('flipped');card.setAttribute('aria-pressed',String(card.classList.contains('flipped')))};
+    card.onclick=event=>{if(!event.target.closest('a,button'))flip()};
+    card.onkeydown=event=>{if(['Enter',' '].includes(event.key)&&!event.target.closest('a,button')){event.preventDefault();flip()}};
+  });
 }
 
 function toggleSave(id){saved.has(id)?saved.delete(id):saved.add(id);localStorage.setItem('savedCoasters',JSON.stringify([...saved]));updateSaved();renderCards()}
@@ -66,10 +79,11 @@ async function fetchSuggestions(){
 
 async function load(){
   try{
-    const [catalogue,stats]=await Promise.all([fetch('/api/coasters?limit=500').then(r=>r.json()),fetch('/api/stats').then(r=>r.json())]);
+    const [catalogue,stats]=await Promise.all([fetch('/api/coasters?limit=2000').then(r=>r.json()),fetch('/api/stats').then(r=>r.json())]);
     coasters=catalogue.items;
     document.querySelector('#rideCount').textContent=stats.coasters;
-    document.querySelector('#countryCount').textContent=stats.parks;
+    document.querySelector('#parkCount').textContent=stats.parks;
+    document.querySelector('#countryCount').textContent=stats.countries;
     renderFilters();renderCards();
   }catch(error){
     document.querySelector('#emptyState').hidden=false;

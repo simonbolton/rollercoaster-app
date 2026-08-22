@@ -54,7 +54,47 @@ def plausible(value, minimum, maximum):
     return value if value is not None and minimum <= value <= maximum else None
 
 
-def normalize(row):
+def point_in_ring(longitude, latitude, ring):
+    inside = False
+    previous = ring[-1]
+    for current in ring:
+        x1, y1 = previous[:2]
+        x2, y2 = current[:2]
+        if (y1 > latitude) != (y2 > latitude):
+            crossing = (x2 - x1) * (latitude - y1) / (y2 - y1) + x1
+            if longitude < crossing:
+                inside = not inside
+        previous = current
+    return inside
+
+
+def load_countries(path):
+    if not path:
+        return []
+    features = json.loads(path.read_text(encoding="utf-8"))["features"]
+    countries = []
+    for feature in features:
+        geometry = feature["geometry"]
+        polygons = [geometry["coordinates"]] if geometry["type"] == "Polygon" else geometry["coordinates"]
+        countries.append((feature["properties"]["ADMIN"], feature.get("bbox"), polygons))
+    return countries
+
+
+def country_for(latitude, longitude, location, countries):
+    if latitude is not None and longitude is not None:
+        for name, bbox, polygons in countries:
+            if bbox and not (bbox[0] <= longitude <= bbox[2] and bbox[1] <= latitude <= bbox[3]):
+                continue
+            if any(point_in_ring(longitude, latitude, polygon[0]) for polygon in polygons):
+                return "United States" if name == "United States of America" else name
+    location_folded = (location or "").casefold()
+    for name, _, _ in countries:
+        if name.casefold() in location_folded:
+            return "United States" if name == "United States of America" else name
+    return None
+
+
+def normalize(row, countries):
     latitude, longitude = number(row.get("latitude")), number(row.get("longitude"))
     capacity = number(row.get("Capacity"))
     inversions = number(row.get("Inversions_clean"))
@@ -62,7 +102,7 @@ def normalize(row):
         "wikidata_id": stable_id(row),
         "name": (row.get("coaster_name") or "").strip(),
         "park": (row.get("Location") or "").strip() or None,
-        "country": None,
+        "country": country_for(latitude, longitude, row.get("Location"), countries),
         "manufacturer": (row.get("Manufacturer") or "").strip() or None,
         "opened": (row.get("opening_date_clean") or "").strip() or None,
         "height_m": plausible(height_metres(row), 1, 250),
@@ -71,6 +111,7 @@ def normalize(row):
         "capacity": int(plausible(capacity, 1, 10000)) if plausible(capacity, 1, 10000) is not None else None,
         "inversions": int(plausible(inversions, 0, 20)) if plausible(inversions, 0, 20) is not None else None,
         "image_url": None,
+        "image_source_url": None,
         "latitude": latitude,
         "longitude": longitude,
         "source_url": (row.get("Website") or "").strip() or DATASET_URL,
@@ -81,13 +122,15 @@ def main():
     parser = argparse.ArgumentParser(description="Normalize the CC0 Wikipedia rollercoaster dataset")
     parser.add_argument("csv_path", type=Path)
     parser.add_argument("--output", type=Path, default=Path(__file__).resolve().parent.parent / "data" / "seed.json")
+    parser.add_argument("--countries", type=Path, help="Natural Earth countries GeoJSON used for coordinate lookup")
     args = parser.parse_args()
+    countries = load_countries(args.countries)
     with args.csv_path.open(encoding="utf-8-sig", newline="") as source:
         records_by_id = {}
         for row in csv.DictReader(source):
             if not (row.get("coaster_name") or "").strip():
                 continue
-            record = normalize(row)
+            record = normalize(row, countries)
             current = records_by_id.get(record["wikidata_id"])
             if current is None or sum(value is not None for value in record.values()) > sum(value is not None for value in current.values()):
                 records_by_id[record["wikidata_id"]] = record
