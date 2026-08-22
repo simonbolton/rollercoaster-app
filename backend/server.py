@@ -7,7 +7,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from database import connect, seed_if_empty
+from database import connect, seed_catalogue
 
 ROOT = Path(__file__).resolve().parent.parent
 PORT = int(os.getenv("PORT", "8080"))
@@ -119,6 +119,6 @@ class Handler(SimpleHTTPRequestHandler):
 
 if __name__ == "__main__":
     mimetypes.add_type("text/javascript", ".js")
-    seed_if_empty()
+    seed_catalogue()
     print(f"Airtime Atlas listening on http://0.0.0.0:{PORT}")
     ThreadingHTTPServer(("0.0.0.0", PORT), Handler).serve_forever()

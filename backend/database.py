@@ -67,8 +67,6 @@ def upsert_many(records):
     return len(records)
 
 
-def seed_if_empty():
-    with connect() as connection:
-        count = connection.execute("SELECT COUNT(*) FROM coasters").fetchone()[0]
-    if count == 0:
-        upsert_many(json.loads(SEED_PATH.read_text(encoding="utf-8")))
+def seed_catalogue():
+    """Upsert the bundled catalogue so existing Docker volumes receive new records."""
+    upsert_many(json.loads(SEED_PATH.read_text(encoding="utf-8")))

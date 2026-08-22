@@ -2,6 +2,8 @@
 
 A responsive rollercoaster discovery app backed by SQLite. It imports openly licensed statistics from Wikidata, exposes a JSON API, and publishes multi-platform images to GitHub Container Registry.
 
+The bundled worldwide catalogue is normalized from Rob Mulla's CC0 Wikipedia rollercoaster dataset. Wikidata remains the refresh source for newer records.
+
 ## Run with Docker
 
 ```bash
@@ -10,7 +12,7 @@ docker compose up --build
 
 Open <http://localhost:8080>. The container health endpoint is available at `/health`.
 
-The first start seeds the database immediately, then refreshes it from Wikidata in the background. Data is persisted in the `coaster-data` Docker volume. Set `SYNC_ON_START=false` to disable automatic refreshes.
+Every start upserts the bundled catalogue, then refreshes it from Wikidata in the background. This means existing Docker volumes receive newly bundled coasters without losing locally persisted data. Set `SYNC_ON_START=false` to disable automatic refreshes.
 
 ## API
 
@@ -20,6 +22,14 @@ The first start seeds the database immediately, then refreshes it from Wikidata 
 - `GET /api/stats`
 
 Records include height, track length, speed, opening date, park, country, manufacturer, capacity, inversions, coordinates, and source URL where Wikidata provides them. Missing source values are returned as `null`.
+
+## Data sources
+
+- The bundled catalogue is derived from the [Roller Coaster Database dataset](https://www.kaggle.com/datasets/robikscube/rollercoaster-database), released under CC0 and originally collected from Wikipedia.
+- `backend/import_cc0.py` reproduces the normalization from the downloaded `coaster_db.csv` file.
+- `backend/sync_wikidata.py` adds or updates records from Wikidata through a configurable SPARQL endpoint.
+
+The importer rejects implausible measurement outliers and never manufactures missing statistics.
 
 ## Pull the published image
 

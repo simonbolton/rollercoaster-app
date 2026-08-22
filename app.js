@@ -69,7 +69,7 @@ async function load(){
     const [catalogue,stats]=await Promise.all([fetch('/api/coasters?limit=500').then(r=>r.json()),fetch('/api/stats').then(r=>r.json())]);
     coasters=catalogue.items;
     document.querySelector('#rideCount').textContent=stats.coasters;
-    document.querySelector('#countryCount').textContent=stats.countries;
+    document.querySelector('#countryCount').textContent=stats.parks;
     renderFilters();renderCards();
   }catch(error){
     document.querySelector('#emptyState').hidden=false;

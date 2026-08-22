@@ -1,21 +1,40 @@
 import json
+import argparse
+import os
 import time
-import urllib.parse
 import urllib.request
+from pathlib import Path
 from urllib.error import HTTPError
 
 from database import upsert_many
 
-ENDPOINT = "https://query.wikidata.org/sparql"
-QUERY = """
+ENDPOINT = os.getenv("WIKIDATA_SPARQL_ENDPOINT", "https://qlever.dev/api/wikidata")
+ID_QUERY = """
+PREFIX wd: <http://www.wikidata.org/entity/>
+PREFIX wdt: <http://www.wikidata.org/prop/direct/>
+SELECT DISTINCT ?coaster WHERE {
+  ?coaster wdt:P31 wd:Q204832.
+}
+ORDER BY ?coaster
+LIMIT 5000
+"""
+DETAIL_QUERY = """
+PREFIX wd: <http://www.wikidata.org/entity/>
+PREFIX wdt: <http://www.wikidata.org/prop/direct/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 SELECT DISTINCT ?coaster ?coasterLabel ?parkLabel ?countryLabel
   ?manufacturerLabel ?opened ?height ?length ?speed ?capacity ?inversions
   ?image ?coordinates
 WHERE {
-  ?coaster wdt:P31 wd:Q204832.
+  VALUES ?coaster { %s }
+  ?coaster rdfs:label ?coasterLabel.
+  FILTER(LANG(?coasterLabel) = "en")
   OPTIONAL { ?coaster wdt:P276 ?park. }
   OPTIONAL { ?park wdt:P17 ?country. }
+  OPTIONAL { ?park rdfs:label ?parkLabel. FILTER(LANG(?parkLabel) = "en") }
+  OPTIONAL { ?country rdfs:label ?countryLabel. FILTER(LANG(?countryLabel) = "en") }
   OPTIONAL { ?coaster wdt:P176 ?manufacturer. }
+  OPTIONAL { ?manufacturer rdfs:label ?manufacturerLabel. FILTER(LANG(?manufacturerLabel) = "en") }
   OPTIONAL { ?coaster wdt:P571 ?opened. }
   OPTIONAL { ?coaster wdt:P2048 ?height. }
   OPTIONAL { ?coaster wdt:P2043 ?length. }
@@ -24,9 +43,7 @@ WHERE {
   OPTIONAL { ?coaster wdt:P2670 ?inversions. }
   OPTIONAL { ?coaster wdt:P18 ?image. }
   OPTIONAL { ?coaster wdt:P625 ?coordinates. }
-  SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
 }
-LIMIT 1000
 """
 
 
@@ -47,21 +64,33 @@ def parse_point(point):
     return float(latitude), float(longitude)
 
 
-def fetch():
-    body = urllib.parse.urlencode({"query": QUERY, "format": "json"}).encode()
+def fetch_query(query):
+    body = query.encode("utf-8")
     request = urllib.request.Request(ENDPOINT, data=body, headers={
         "Accept": "application/sparql-results+json",
-        "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
+        "Content-Type": "application/sparql-query; charset=utf-8",
         "User-Agent": "AirtimeAtlas/1.0 (https://github.com/simonbolton/rollercoaster-app)",
     })
-    for attempt in range(3):
+    for attempt in range(5):
         try:
             with urllib.request.urlopen(request, timeout=120) as response:
                 return json.load(response)["results"]["bindings"]
         except HTTPError as error:
-            if error.code != 429 or attempt == 2:
+            if error.code not in {429, 502, 503, 504} or attempt == 4:
                 raise
-            time.sleep(min(int(error.headers.get("Retry-After", "10")), 30))
+            time.sleep(min(int(error.headers.get("Retry-After", "5")) * (attempt + 1), 45))
+
+
+def fetch():
+    ids = [value(row, "coaster").rsplit("/", 1)[-1] for row in fetch_query(ID_QUERY)]
+    bindings = []
+    for index in range(0, len(ids), 25):
+        batch = ids[index:index + 25]
+        query = DETAIL_QUERY % " ".join(f"wd:{wikidata_id}" for wikidata_id in batch)
+        bindings.extend(fetch_query(query))
+        print(f"Fetched {min(index + len(batch), len(ids))}/{len(ids)} entities", flush=True)
+        time.sleep(1)
+    return bindings
 
 
 def normalize(bindings):
@@ -94,5 +123,13 @@ def normalize(bindings):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Import rollercoasters from Wikidata")
+    parser.add_argument("--write-seed", action="store_true", help="replace data/seed.json with the normalized catalogue")
+    args = parser.parse_args()
     records = normalize(fetch())
-    print(f"Imported {upsert_many(records)} rollercoasters from Wikidata")
+    imported = upsert_many(records)
+    if args.write_seed:
+        seed_path = Path(__file__).resolve().parent.parent / "data" / "seed.json"
+        seed_path.write_text(json.dumps(sorted(records, key=lambda item: item["name"]), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        print(f"Wrote {len(records)} records to {seed_path}")
+    print(f"Imported {imported} rollercoasters from Wikidata")
