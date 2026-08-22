@@ -33,6 +33,8 @@ class Handler(SimpleHTTPRequestHandler):
             return self.send_json({"status": "healthy"})
         if parsed.path == "/api/coasters":
             return self.list_coasters(parse_qs(parsed.query))
+        if parsed.path == "/api/parks":
+            return self.list_parks(parse_qs(parsed.query))
         if parsed.path == "/api/search":
             return self.search_coasters(parse_qs(parsed.query))
         if parsed.path == "/api/stats":
@@ -68,6 +70,46 @@ class Handler(SimpleHTTPRequestHandler):
         with connect() as connection:
             row = connection.execute("SELECT * FROM coasters WHERE wikidata_id = ?", (wikidata_id,)).fetchone()
         self.send_json(dict(row) if row else {"error": "Coaster not found"}, 200 if row else 404)
+
+    def list_parks(self, params):
+        search = params.get("q", [""])[0].strip()
+        country = params.get("country", [""])[0].strip()
+        limit = min(max(int(params.get("limit", ["500"])[0]), 1), 2000)
+        offset = max(int(params.get("offset", ["0"])[0]), 0)
+        where, values = ["park IS NOT NULL", "TRIM(park) <> ''"], []
+        if search:
+            where.append("(park LIKE ? OR country LIKE ?)")
+            values.extend([f"%{search}%"] * 2)
+        if country:
+            where.append("country = ?")
+            values.append(country)
+        clause = f"WHERE {' AND '.join(where)}"
+        query = f"""
+          SELECT park AS name, country, COUNT(DISTINCT name) AS coaster_count,
+                 MAX(height_m) AS tallest_m, MAX(speed_kmh) AS fastest_kmh,
+                 MIN(CASE WHEN opened IS NOT NULL THEN SUBSTR(opened, 1, 4) END) AS first_coaster_year,
+                 MAX(CASE WHEN opened IS NOT NULL THEN SUBSTR(opened, 1, 4) END) AS latest_coaster_year,
+                 (SELECT image_url FROM coasters photo
+                    WHERE photo.park = coasters.park AND photo.image_url IS NOT NULL
+                    ORDER BY photo.height_m DESC NULLS LAST LIMIT 1) AS image_url,
+                 (SELECT image_source_url FROM coasters photo
+                    WHERE photo.park = coasters.park AND photo.image_url IS NOT NULL
+                    ORDER BY photo.height_m DESC NULLS LAST LIMIT 1) AS image_source_url
+          FROM coasters {clause}
+          GROUP BY park, country
+          ORDER BY park LIMIT ? OFFSET ?
+        """
+        with connect() as connection:
+            total = connection.execute(
+                f"SELECT COUNT(*) FROM (SELECT 1 FROM coasters {clause} GROUP BY park, country)", values
+            ).fetchone()[0]
+            rows = connection.execute(query, [*values, limit, offset]).fetchall()
+        items = []
+        for row in rows:
+            item = dict(row)
+            item["park_id"] = f"{item['country'] or ''}:{item['name']}"
+            items.append(item)
+        self.send_json({"total": total, "limit": limit, "offset": offset, "items": items})
 
     def search_coasters(self, params):
         query = params.get("q", [""])[0].strip().casefold()

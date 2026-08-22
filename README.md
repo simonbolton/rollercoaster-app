@@ -17,6 +17,7 @@ Every start upserts the bundled catalogue, then refreshes it from Wikidata in th
 ## API
 
 - `GET /api/coasters?q=taron&country=Germany&limit=100&offset=0`
+- `GET /api/parks?q=energylandia&country=Poland&limit=500&offset=0`
 - `GET /api/search?q=stel+vengeance&limit=8` (ranked fuzzy suggestions)
 - `GET /api/coasters/Q16665871`
 - `GET /api/stats`
@@ -32,6 +33,8 @@ The API stores measurements in metric units; the web interface converts height a
 - `backend/index_images.py` indexes representative photos and source pages through Wikipedia's public API.
 
 Every coaster card also links to a targeted YouTube search for a front-seat POV using the ride and park names, avoiding stale hard-coded video IDs.
+
+The Parks catalogue is derived from the coaster records and summarizes each park's indexed coaster count, tallest and fastest rides, opening-year span, and a representative indexed photo.
 - `backend/sync_wikidata.py` adds or updates records from Wikidata through a configurable SPARQL endpoint.
 
 The importer rejects implausible measurement outliers and never manufactures missing statistics.
