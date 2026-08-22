@@ -20,7 +20,14 @@ function renderFilters(){
     const button=document.createElement('button');
     button.className=`filter ${country===activeCountry?'active':''}`;
     button.textContent=country;
-    button.onclick=()=>{activeCountry=country;renderFilters();renderCards()};
+    button.onclick=()=>{
+      activeCountry=country;
+      search.value='';
+      closeSuggestions();
+      clearTimeout(searchTimer);
+      renderFilters();
+      renderCards();
+    };
     filters.appendChild(button);
   });
 }
