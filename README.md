@@ -23,6 +23,8 @@ Every start upserts the bundled catalogue, then refreshes it from Wikidata in th
 
 Records include height, track length, speed, opening date, park, country, manufacturer, capacity, inversions, coordinates, and source URL where Wikidata provides them. Missing source values are returned as `null`.
 
+The API stores measurements in metric units; the web interface converts height and track length to feet for display.
+
 ## Data sources
 
 - The bundled catalogue is derived from the [Roller Coaster Database dataset](https://www.kaggle.com/datasets/robikscube/rollercoaster-database), released under CC0 and originally collected from Wikipedia.

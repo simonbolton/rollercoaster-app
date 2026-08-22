@@ -10,6 +10,7 @@ let activeSuggestion=-1;
 let searchTimer;
 
 const display=(value,suffix='')=>value===null||value===undefined?'—':`${Number.isInteger(value)?value:Number(value).toFixed(1)}${suffix}`;
+const feet=value=>value===null||value===undefined?'—':`${Math.round(value*3.28084).toLocaleString()}ft`;
 const colorFor=name=>['#ff6848','#9cddff','#d8ff3e','#ffc56b','#cab7ff','#71e2be','#ff9bc7','#f0a466','#85a7ff'][[...name].reduce((n,c)=>n+c.charCodeAt(0),0)%9];
 const escapeHtml=value=>String(value).replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
 const youtubePovUrl=coaster=>`https://www.youtube.com/results?search_query=${encodeURIComponent(`${coaster.name} ${coaster.park||''} roller coaster POV front seat`)}`;
@@ -40,7 +41,7 @@ function renderCards(){
       <div class="card-face card-front">
         <div class="card-visual" style="--card-color:${colorFor(c.name)}"><span class="rank">${String(index+1).padStart(2,'0')}</span><button class="save ${saved.has(c.wikidata_id)?'saved':''}" data-id="${c.wikidata_id}" aria-label="Save ${escapeHtml(c.name)}">${saved.has(c.wikidata_id)?'♥':'♡'}</button></div>
         <div class="card-body"><span class="type">${escapeHtml(c.manufacturer||'Manufacturer unknown')}</span><h3>${escapeHtml(c.name)}</h3><p class="location">${escapeHtml(c.park||'Park unknown')}${c.country?` · ${escapeHtml(c.country)}`:''}</p>
-        <div class="metrics"><div><strong>${display(c.height_m,'m')}</strong><span>Height</span></div><div><strong>${display(c.length_m,'m')}</strong><span>Length</span></div><div><strong>${display(c.speed_kmh)}</strong><span>km/h</span></div><div><strong>${c.opened?.slice(0,4)||'—'}</strong><span>Opened</span></div></div>
+        <div class="metrics"><div><strong>${feet(c.height_m)}</strong><span>Height</span></div><div><strong>${feet(c.length_m)}</strong><span>Length</span></div><div><strong>${display(c.speed_kmh)}</strong><span>km/h</span></div><div><strong>${c.opened?.slice(0,4)||'—'}</strong><span>Opened</span></div></div>
         ${c.capacity?`<p class="capacity">Capacity: ${c.capacity.toLocaleString()} riders/hour</p>`:''}<span class="flip-hint">Click to see photo ↗</span></div>
       </div>
       <div class="card-face card-back" style="--card-color:${colorFor(c.name)}">
